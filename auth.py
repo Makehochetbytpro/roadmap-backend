@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import User
-from schemas import UserCreate
+from schemas import UserCreate #schemas->UserCreate(registration)
+from schemas import UserCreate, UserLogin #schemas->UserLogin
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -53,12 +54,12 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     return {"message": "User registered successfully"}
 
 @router.post("/login")
-def login(user_data: UserCreate, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == user_data.email).first()
+def login(user_data: UserLogin, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == user_data.username).first()
     if not user or not user.verify_password(user_data.password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     
-    access_token = create_access_token(data={"sub": user.email})
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/protected")
