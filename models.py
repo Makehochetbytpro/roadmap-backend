@@ -8,14 +8,21 @@ import datetime
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+from enum import Enum
+
+class UserRole(Enum):
+    USER = 1
+    ADMIN = 2
+
+
 class User(Base):
     __tablename__ = "User"
 
     user_id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, nullable=False)
     email = Column(String(100), unique=True, nullable=False)
-    password = Column(String(255), nullable=False)  # Хэшированный пароль
-    role = Column(String(45), nullable=False)
+    password = Column(BYTEA, nullable=False)  # Хэшированный пароль
+    role = Column(Integer, nullable=False, default=UserRole.USER.value)  # Добавил default user
 
     roadmaps = relationship("Roadmap", back_populates="user")
     comments = relationship("Comment", back_populates="user")
@@ -23,11 +30,12 @@ class User(Base):
 
     # Хэширование пароля
     def set_password(self, password: str):
-        self.password = pwd_context.hash(password)
+        self.password = pwd_context.hash(password).encode() #кодируем в bytes
 
     # Проверка пароля
-    def verify_password(self, password: str):
-        return pwd_context.verify(password, self.password)
+    def verify_password(self, password: str) -> bool:
+        return pwd_context.verify(password, self.password) #обратно преобразуем пароль
+
 
 
 class Category(Base):
