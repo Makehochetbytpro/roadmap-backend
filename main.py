@@ -1,11 +1,10 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from sqlalchemy.sql import text
 from pydantic import BaseModel
 from auth import router as auth_router
-
-
+import math
 
 app = FastAPI()
 app.include_router(auth_router)
@@ -20,7 +19,7 @@ def get_db():
 
 # Эндпоинт для проверки, какие таблицы есть в базе
 @app.get("/check_tables")
-def check_tables(db: Session = Depends(get_db)):  # Передаём сессию через Depends
+def check_tables(db: Session = Depends(get_db)):  
     tables = db.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public'")).fetchall()
     return {"tables": [table[0] for table in tables]}
 
@@ -28,11 +27,33 @@ def check_tables(db: Session = Depends(get_db)):  # Передаём сесси�
 class CategoryCreate(BaseModel):
     name: str
 
-# Эндпоинт для создания категории
 @app.post("/create_category")
 def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     db.execute(text('INSERT INTO "Category" (name) VALUES (:name)'), {"name": category.name})
     db.commit()
     return {"message": "Category created successfully", "category": category.name}
 
+# ====================== БАЙЕСОВСКИЙ АЛГОРИТМ ======================
 
+class Roadmap(BaseModel):
+    name: str
+    likes: int
+    dislikes: int
+
+class RoadmapList(BaseModel):
+    roadmaps: list[Roadmap]
+
+def bayesian_score(likes: int, dislikes: int, C: float = 0.5, m: int = 50) -> float:
+    total_votes = likes + dislikes
+    return (likes + C * m) / (total_votes + m)
+
+@app.post("/rank")
+def rank_roadmaps(data: RoadmapList):
+    roadmaps = data.roadmaps
+    
+    for roadmap in roadmaps:
+        roadmap.bayesian_score = bayesian_score(roadmap.likes, roadmap.dislikes)
+
+    sorted_roadmaps = sorted(roadmaps, key=lambda x: x.bayesian_score, reverse=True)
+
+    return {"bayesian_ranking": sorted_roadmaps}
