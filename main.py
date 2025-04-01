@@ -40,20 +40,21 @@ class Roadmap(BaseModel):
     likes: int
     dislikes: int
 
+    def dict_with_score(self, C: float = 0.5, m: int = 50):
+        bayesian_score = (self.likes + C * m) / (self.likes + self.dislikes + m)
+        return {**self.dict(), "bayesian_score": bayesian_score}
+
 class RoadmapList(BaseModel):
     roadmaps: list[Roadmap]
-
-def bayesian_score(likes: int, dislikes: int, C: float = 0.5, m: int = 50) -> float:
-    total_votes = likes + dislikes
-    return (likes + C * m) / (total_votes + m)
 
 @app.post("/rank")
 def rank_roadmaps(data: RoadmapList):
     roadmaps = data.roadmaps
     
-    for roadmap in roadmaps:
-        roadmap.bayesian_score = bayesian_score(roadmap.likes, roadmap.dislikes)
+    # Преобразуем каждый Roadmap в словарь с добавленным bayesian_score
+    roadmaps_with_scores = [roadmap.dict_with_score() for roadmap in roadmaps]
 
-    sorted_roadmaps = sorted(roadmaps, key=lambda x: x.bayesian_score, reverse=True)
+    # Сортируем по bayesian_score
+    sorted_roadmaps = sorted(roadmaps_with_scores, key=lambda x: x["bayesian_score"], reverse=True)
 
     return {"bayesian_ranking": sorted_roadmaps}
