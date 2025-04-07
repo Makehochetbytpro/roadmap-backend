@@ -1,10 +1,20 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from urllib.parse import quote
 
-DATABASE_URL = "postgresql://postgres:kmrtdk111@localhost:5432/roadmap"
+password = "tralala4@n"
+encoded_password = quote(password)
+
+DATABASE_URL = f"postgresql://postgres:{encoded_password}@localhost:5433/roadmap"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

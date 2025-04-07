@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from sqlalchemy.sql import text
@@ -7,6 +8,15 @@ from auth import router as auth_router
 import math
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Or set specific origins like ["http://localhost:5173"]
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows GET, POST, PUT, DELETE, etc.
+    allow_headers=["*"],  # Allows all headers
+)
+
 app.include_router(auth_router)
 
 # Функция для получения сессии БД
