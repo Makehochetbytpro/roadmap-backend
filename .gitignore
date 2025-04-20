@@ -8,3 +8,12 @@ __pycache__/
 
 # Игнорируем папку настроек VS Code
 .vscode/
+
+# Игнорировать папку alembic и alembic.ini
+/alembic/
+/alembic.ini
+
+#test
+test_relations.py
+roadmap-front.code-workspace
+database.py

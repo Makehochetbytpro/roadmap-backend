@@ -43,6 +43,9 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="User already exists")
+    existing_username = db.query(User).filter(User.username == user_data.username).first()
+    if existing_username:
+        raise HTTPException(status_code=400, detail="Username is taken")
 
     new_user = User(username=user_data.username, email=user_data.email)
     new_user.set_password(user_data.password)  
