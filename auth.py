@@ -67,3 +67,10 @@ def protected_route(user: User = Depends(verify_token)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
     return {"message": f"Hello, {user.username}!"}
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    user = verify_token(token, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return user
+

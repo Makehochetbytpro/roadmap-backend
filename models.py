@@ -57,7 +57,6 @@ class Topic(Base):
     topic_id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     description = Column(Text)
-    comment = Column(Text)
     topic_likes = relationship("TopicLike", back_populates="topic", cascade="all, delete-orphan")
     like_count = Column(Integer, default=0)
     dislike_count = Column(Integer, default=0)
@@ -69,6 +68,7 @@ class Topic(Base):
     roadmap = relationship("Roadmap", back_populates="topic", uselist=False)  # Один к одному
     c_roadmaps = relationship("CommunityRoadmap", back_populates="topic")
 
+    comments = relationship("Comment", back_populates="topic", cascade="all, delete-orphan")  # Связь с комментариями
 
 
 class Roadmap(Base):
@@ -82,7 +82,7 @@ class Roadmap(Base):
     topic = relationship("Topic", back_populates="roadmap")  # Связь с топиком
     user = relationship("User")  # Кто создал
     steps = relationship("Step", back_populates="roadmap", cascade="all, delete-orphan")
-    comments = relationship("Comment", back_populates="roadmap", cascade="all, delete-orphan")
+    #comments = relationship("Comment", back_populates="roadmap", cascade="all, delete-orphan")
 
     # community_roadmap өзгергенде оригинальный роадмап озгерген
 
@@ -153,12 +153,16 @@ class Comment(Base):
 
     comment_id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("User.user_id", ondelete="CASCADE"))
-    roadmap_id = Column(Integer, ForeignKey("Roadmap.roadmap_id", ondelete="CASCADE"))
+    topic_id = Column(Integer, ForeignKey("Topic.topic_id", ondelete="CASCADE"))
+    parent_comment_id = Column(Integer, ForeignKey("Comment.comment_id", ondelete="CASCADE"), nullable=True) # для ответов на комменты
+
     content = Column(Text, nullable=False)
     created_at = Column(TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
+    edited = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="comments")
-    roadmap = relationship("Roadmap", back_populates="comments")
+    topic = relationship("Topic", back_populates="comments")
+    parent = relationship("Comment", remote_side=[comment_id], backref="replies") # для ответов на комменты
     comment_likes = relationship("CommentLike", back_populates="comment", cascade="all, delete-orphan")
 
 
