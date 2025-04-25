@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr
+from typing import List, Optional
+from pydantic import BaseModel, EmailStr, Field
+from pydantic import root_validator
+import json
 
 # ===== Регистрация и логин   =======
 class UserCreate(BaseModel):
@@ -52,6 +54,51 @@ class CommentResponse(BaseModel):
     parent_comment_id: Optional[int]
     content: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ======= Материалы в каждом Шаге =========
+
+class StepMaterialBase(BaseModel):
+    roadmap_id: int
+    step_id: int
+    name: str
+    description: Optional[str] = None
+    tip: Optional[str] = None
+    videos: Optional[List[str]] = Field(default_factory=list)
+    books: Optional[List[str]] = Field(default_factory=list)
+    completed: bool = False
+
+
+class StepMaterialCreate(StepMaterialBase):
+    pass
+
+
+class StepMaterialUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    tip: Optional[str] = None
+    videos: Optional[List[str]] = None
+    books: Optional[List[str]] = None
+    completed: Optional[bool] = None
+
+
+
+class StepMaterialOut(StepMaterialBase):
+    material_id: int
+    created_at: datetime
+
+    @root_validator(pre=True)
+    def convert_string_fields_to_lists(cls, values):
+        for field in ['videos', 'books']:
+            val = getattr(values, field, None)
+            if isinstance(val, str):
+                try:
+                    setattr(values, field, json.loads(val))
+                except json.JSONDecodeError:
+                    setattr(values, field, [])
+        return values
 
     class Config:
         from_attributes = True

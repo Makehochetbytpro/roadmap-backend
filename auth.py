@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Form
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import User
@@ -26,15 +28,19 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-def verify_token(token: str, db: Session = Depends(get_db)):
+oauth2_scheme = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    token = credentials.credentials  # Получаем сам токен из Authorization Bearer
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        email = payload.get("sub")
-        if email is None:
+        username = payload.get("sub")
+        if username is None:
             return None
-        return db.query(User).filter(User.email == email).first()
+        return db.query(User).filter(User.username == username).first()
     except JWTError:
-        return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
 
 router = APIRouter()
 
@@ -67,6 +73,7 @@ def protected_route(user: User = Depends(verify_token)):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid token")
     return {"message": f"Hello, {user.username}!"}
+
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     user = verify_token(token, db)

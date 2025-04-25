@@ -148,6 +148,33 @@ class Step(Base):
     parent = relationship("Step", remote_side=[step_id], backref="sub_steps")  # связь с родителем и дочерними шагами
 
 
+class StepMaterial(Base):
+    __tablename__ = "StepMaterial"
+
+    material_id = Column(Integer, primary_key=True, index=True)
+    roadmap_id = Column(Integer, ForeignKey("Roadmap.roadmap_id", ondelete="CASCADE"), nullable=False)
+    step_id = Column(Integer, ForeignKey("Step.step_id", ondelete="CASCADE"), nullable=False)
+
+    name = Column(String(255), nullable=False)  # Название сабтопика
+    description = Column(Text, nullable=True)
+    tip = Column(Text, nullable=True)
+    videos = Column(Text, nullable=True)  # Храним JSON или сериализованный список ссылок
+    books = Column(Text, nullable=True)   # Храним JSON или сериализованный список ссылок
+    completed = Column(Boolean, default=False)
+    created_at = Column(TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
+
+    step = relationship("Step", backref="step_materials")
+    roadmap = relationship("Roadmap")
+
+    def serialize_links(self):
+        """Вспомогательная функция если хочешь обрабатывать поля как list"""
+        import json
+        return {
+            "videos": json.loads(self.videos or "[]"),
+            "books": json.loads(self.books or "[]"),
+        }
+
+
 class Comment(Base):
     __tablename__ = "Comment"
 
