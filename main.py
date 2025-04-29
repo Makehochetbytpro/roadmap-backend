@@ -1,13 +1,15 @@
 import datetime
 import json
 from fastapi import FastAPI, Depends, HTTPException, APIRouter
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
 from pydantic import BaseModel
 from typing import List
 from database import SessionLocal
-from models import Topic, Roadmap, User, Step, Comment, CommentLike, TopicLike,StepMaterial
-from schemas import RoadmapCreateRequest, StepCreateRequest, StepResponse, CommentCreate, CommentResponse, StepMaterialBase,StepMaterialCreate,StepMaterialOut,StepMaterialUpdate
+from models import Topic, Roadmap, User, Step, Comment, CommentLike, TopicLike,StepMaterial, CommunityRoadmap, Vote, Category
+from schemas import RoadmapCreateRequest, StepCreateRequest, StepResponse, CommentCreate, CommentResponse,StepMaterialCreate,StepMaterialOut,StepMaterialUpdate
+from schemas import CommunityRoadmapCreate, CommunityRoadmapInDB, CommunityRoadmapUpdate, VoteCreate, VoteInDB, CategoryOut, TopicRead, CategoryWithTopics
 from auth import router as auth_router
 from auth import get_current_user
 
@@ -45,7 +47,39 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create category: {str(e)}")
+    
+#получение всех категории
+@app.get("/categories", response_model=List[CategoryOut])
+def get_categories(db: Session = Depends(get_db)):
+    categories = db.query(Category).all()
+    return categories
 
+# Получить все категории с топиками
+@app.get("/categories_with_topics", response_model=List[CategoryWithTopics])
+def get_categories_with_topics(db: Session = Depends(get_db)):
+    categories = db.query(Category).all()  # Получаем все категории из базы данных
+    if not categories:
+        raise HTTPException(status_code=404, detail="Categories not found")
+
+    # Создаем ответ, который будет включать категорию с её топиками
+    result = []
+    for category in categories:
+        category_data = CategoryWithTopics(
+            category_id=category.category_id,
+            name=category.name,
+            topics=[TopicRead(
+                topic_id=topic.topic_id,
+                name=topic.name,
+                description=topic.description,
+                like_count=topic.like_count,
+                dislike_count=topic.dislike_count,
+                category_id=category.category_id,
+                image=topic.image
+            ) for topic in category.topics]
+        )
+        result.append(category_data)
+
+    return result
 
 # ====================== БАЙЕСОВСКИЙ АЛГОРИТМ ======================
 
@@ -66,6 +100,14 @@ def rank_roadmaps(data: RoadmapListRequest):
     roadmaps_with_scores = [roadmap.dict_with_score() for roadmap in data.roadmaps]
     sorted_roadmaps = sorted(roadmaps_with_scores, key=lambda x: x["bayesian_score"], reverse=True)
     return {"bayesian_ranking": sorted_roadmaps}
+
+#============================ ПОЛУЧЕНИЕ ВСЕХ ТОПИКОВ =========================
+
+@app.get("/topics/", response_model=List[TopicRead])
+def get_all_topics(db: Session = Depends(get_db)):
+    topics = db.query(Topic).all()
+    return topics
+
 
 # ========================== ЛАЙКИ НА ТОПИК ==========================
 
@@ -379,4 +421,118 @@ def delete_step_material(material_id: int, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка при удалении материала: {str(e)}")
 
+#========= CommunityRoadmap ================================================================
 
+# Создать CommunityRoadmap
+@app.post("/community_roadmap/", response_model=CommunityRoadmapInDB)
+def create_community_roadmap(
+    community_roadmap: CommunityRoadmapCreate, db: Session = Depends(get_db)
+):
+    db_community_roadmap = CommunityRoadmap(**community_roadmap.dict())
+    db.add(db_community_roadmap)
+    db.commit()
+    db.refresh(db_community_roadmap)
+    return db_community_roadmap
+
+# Получить все CommunityRoadmaps
+@app.get("/community_roadmaps/", response_model=list[CommunityRoadmapInDB])
+def get_community_roadmaps(db: Session = Depends(get_db)):
+    db_community_roadmaps = db.execute(select(CommunityRoadmap)).scalars().all()
+    return db_community_roadmaps
+
+# Получить CommunityRoadmap по ID
+@app.get("/community_roadmap/{c_roadmap_id}", response_model=CommunityRoadmapInDB)
+def get_community_roadmap(c_roadmap_id: int, db: Session = Depends(get_db)):
+    db_community_roadmap = db.query(CommunityRoadmap).filter(CommunityRoadmap.c_roadmap_id == c_roadmap_id).first()
+    if db_community_roadmap is None:
+        raise HTTPException(status_code=404, detail="CommunityRoadmap not found")
+    return db_community_roadmap
+
+# Обновить CommunityRoadmap
+@app.put("/community_roadmap/{c_roadmap_id}", response_model=CommunityRoadmapInDB)
+def update_community_roadmap(
+    c_roadmap_id: int, community_roadmap: CommunityRoadmapUpdate, db: Session = Depends(get_db)
+):
+    db_community_roadmap = db.query(CommunityRoadmap).filter(CommunityRoadmap.c_roadmap_id == c_roadmap_id).first()
+    if db_community_roadmap is None:
+        raise HTTPException(status_code=404, detail="CommunityRoadmap not found")
+    
+    for key, value in community_roadmap.dict(exclude_unset=True).items():
+        setattr(db_community_roadmap, key, value)
+
+    db.commit()
+    db.refresh(db_community_roadmap)
+    return db_community_roadmap
+
+# Удалить CommunityRoadmap
+@app.delete("/community_roadmap/{c_roadmap_id}")
+def delete_community_roadmap(c_roadmap_id: int, db: Session = Depends(get_db)):
+    db_community_roadmap = db.query(CommunityRoadmap).filter(CommunityRoadmap.c_roadmap_id == c_roadmap_id).first()
+    if db_community_roadmap is None:
+        raise HTTPException(status_code=404, detail="CommunityRoadmap not found")
+
+    db.delete(db_community_roadmap)
+    db.commit()
+    return {"message": "CommunityRoadmap deleted successfully"}
+
+# =========== VOTE for COMMUNITY ROADMAP ================================
+
+
+# Создать голосование
+@app.post("/vote/", response_model=VoteInDB)
+def create_vote(vote: VoteCreate, db: Session = Depends(get_db)):
+    # Проверяем, если пользователь уже голосовал за этот community_roadmap
+    existing_vote = db.query(Vote).filter(
+        Vote.user_id == vote.user_id, Vote.c_roadmap_id == vote.c_roadmap_id
+    ).first()
+    if existing_vote:
+        raise HTTPException(status_code=400, detail="User has already voted on this roadmap")
+
+    db_vote = Vote(**vote.dict())
+    db.add(db_vote)
+    db.commit()
+    db.refresh(db_vote)
+
+    # Обновляем количество голосов в CommunityRoadmap
+    community_roadmap = db.query(CommunityRoadmap).filter(
+        CommunityRoadmap.c_roadmap_id == vote.c_roadmap_id
+    ).first()
+    if community_roadmap:
+        community_roadmap.update_votes()  # Обновляем голоса
+        db.commit()
+    
+    return db_vote
+
+# Получить все голоса для конкретного CommunityRoadmap
+@app.get("/votes/{c_roadmap_id}", response_model=list[VoteInDB])
+def get_votes_by_roadmap(c_roadmap_id: int, db: Session = Depends(get_db)):
+    votes = db.query(Vote).filter(Vote.c_roadmap_id == c_roadmap_id).all()
+    return votes
+
+# Получить голос по ID
+@app.get("/vote/{vote_id}", response_model=VoteInDB)
+def get_vote(vote_id: int, db: Session = Depends(get_db)):
+    vote = db.query(Vote).filter(Vote.vote_id == vote_id).first()
+    if vote is None:
+        raise HTTPException(status_code=404, detail="Vote not found")
+    return vote
+
+# Удалить голос
+@app.delete("/vote/{vote_id}")
+def delete_vote(vote_id: int, db: Session = Depends(get_db)):
+    vote = db.query(Vote).filter(Vote.vote_id == vote_id).first()
+    if vote is None:
+        raise HTTPException(status_code=404, detail="Vote not found")
+
+    db.delete(vote)
+    db.commit()
+
+    # Обновляем количество голосов в CommunityRoadmap
+    community_roadmap = db.query(CommunityRoadmap).filter(
+        CommunityRoadmap.c_roadmap_id == vote.c_roadmap_id
+    ).first()
+    if community_roadmap:
+        community_roadmap.update_votes()  # Обновляем голоса
+        db.commit()
+
+    return {"message": "Vote deleted successfully"}

@@ -14,6 +14,37 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+#========= Получение всех категории ========
+class CategoryOut(BaseModel):
+    category_id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+# ======== ПОЛУЧЕНИЕ ВСЕХ ТОПИКОВ =========
+class TopicRead(BaseModel):
+    topic_id: int
+    name: str
+    description: Optional[str] = None
+    like_count: int
+    dislike_count: int
+    category_id: int
+    image: Optional[bytes] = None  
+
+    class Config:
+        from_attributes = True
+
+# =========== Получение всех категории вместе с топиком =========
+
+class CategoryWithTopics(BaseModel):
+    category_id: int
+    name: str
+    topics: List[TopicRead]  # Список топиков, которые принадлежат категории
+
+    class Config:
+        from_attributes = True
+
 # ====== Создание самого роадмапа  =======
 class RoadmapCreateRequest(BaseModel):
     topic_id: int
@@ -103,3 +134,37 @@ class StepMaterialOut(StepMaterialBase):
     class Config:
         from_attributes = True
 
+# ====== CommunityRoadmap =========
+
+class CommunityRoadmapBase(BaseModel):
+    topic_id: int
+    proposed_steps: str
+
+class CommunityRoadmapCreate(CommunityRoadmapBase):
+    pass
+
+class CommunityRoadmapUpdate(CommunityRoadmapBase):
+    upvotes: Optional[int] = None
+    downvotes: Optional[int] = None
+
+class CommunityRoadmapInDB(CommunityRoadmapBase):
+    c_roadmap_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# ======== Vote for CommunityRoadmap ==============
+class VoteBase(BaseModel):
+    user_id: int
+    c_roadmap_id: int
+    vote_type: str  # "upvote" or "downvote"
+
+class VoteCreate(VoteBase):
+    pass
+
+class VoteInDB(VoteBase):
+    vote_id: int
+
+    class Config:
+        from_attributes = True
