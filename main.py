@@ -13,6 +13,7 @@ from schemas import CommunityRoadmapCreate, CommunityRoadmapInDB, CommunityRoadm
 from auth import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
 from auth import get_current_user
+from typing import Optional
 
 
 app = FastAPI()
@@ -318,10 +319,13 @@ def get_topic_likes(topic_id: int, db: Session = Depends(get_db)):
     return {"likes": likes, "dislikes": dislikes}
 
 # =========================== ЛАЙКИ КОММЕНТАРИЕВ ===========================
+class LikeRequest(BaseModel):
+    is_like: Optional[bool]
 
 @app.post("/comments/{comment_id}/like")
-def like_comment(comment_id: int, is_like: bool, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def like_comment(comment_id: int, like_data: LikeRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
+        is_like = like_data.is_like
         comment_like = db.query(CommentLike).filter_by(user_id=current_user.user_id, comment_id=comment_id).first()
         if comment_like:
             comment_like.is_like = is_like

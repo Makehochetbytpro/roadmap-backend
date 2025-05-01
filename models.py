@@ -210,7 +210,7 @@ class TopicLike(Base):
 class CommentLike(Base):
     __tablename__ = "comment_likes"
 
-    like_id = Column(Integer, primary_key=True, index=True)
+    like_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("User.user_id", ondelete="CASCADE"))
     comment_id = Column(Integer, ForeignKey("Comment.comment_id", ondelete="CASCADE"))
     is_like = Column(Boolean, default=True)  # True = лайк, False = дизлайк
