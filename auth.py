@@ -57,21 +57,37 @@ router = APIRouter()
 
 @router.post("/register")
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
+<<<<<<< HEAD
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="User already exists")
     existing_username = db.query(User).filter(User.username == user_data.username).first()
     if existing_username:
         raise HTTPException(status_code=400, detail="Username is taken")
+=======
+    # Проверка email
+    existing_user_by_email = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user_by_email:
+        raise HTTPException(status_code=400, detail="User with this email already exists")
+>>>>>>> d0f962acf62735941ae3a047766cedaf82bacc32
 
+    # Проверка username без учёта регистра
+    existing_user_by_username = db.query(User).filter(
+        User.username.ilike(user_data.username)
+    ).first()
+    if existing_user_by_username:
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    # Создание пользователя
     new_user = User(username=user_data.username, email=user_data.email)
-    new_user.set_password(user_data.password)  
+    new_user.set_password(user_data.password)
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
     return {"message": "User registered successfully"}
+
 
 @router.post("/login")
 def login(user_data: UserLogin, db: Session = Depends(get_db)):

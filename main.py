@@ -252,27 +252,37 @@ def get_replies(comment_id: int, db: Session = Depends(get_db)):
     return replies
 
 # =========================== ДЕРЕВО КОММЕНТАРИЕВ ===========================
-
-def get_comment_likes_count(db: Session, comment_id: int):
+def get_comment_likes_count(db: Session, comment_id: int, user_id: int = None):
     likes = db.query(CommentLike).filter(CommentLike.comment_id == comment_id, CommentLike.is_like == True).count()
     dislikes = db.query(CommentLike).filter(CommentLike.comment_id == comment_id, CommentLike.is_like == False).count()
-    return likes, dislikes
 
-def build_comment_tree(comments, db):
+    user_liked = None
+    if user_id is not None:
+        user_like = db.query(CommentLike).filter(
+            CommentLike.comment_id == comment_id,
+            CommentLike.user_id == user_id
+        ).first()
+        if user_like:
+            user_liked = user_like.is_like  # True (like), False (dislike)
+
+    return likes, dislikes, user_liked
+
+def build_comment_tree(comments, db, current_user_id=None):
     comment_dict = {comment.comment_id: comment for comment in comments}
     tree = []
 
     def serialize(comment):
-        likes, dislikes = get_comment_likes_count(db, comment.comment_id)
+        likes, dislikes, user_liked = get_comment_likes_count(db, comment.comment_id, current_user_id)
         return {
             "comment_id": comment.comment_id,
-            "user_id": comment.user_id,
+            "username": comment.user.username,  # Заменили user_id на username
             "text": comment.content,
             "date": comment.created_at.strftime("%Y-%m-%d"),
             "edited": comment.edited,
             "likes": likes,
             "dislikes": dislikes,
-            "parent_id": comment.parent_comment_id or None,
+            "user_liked": user_liked,  # True, False или None
+            "parent_username": comment.parent_comment_id and comment_dict.get(comment.parent_comment_id).user.username,  # Родительский username
             "reply": []
         }
 
@@ -289,9 +299,14 @@ def build_comment_tree(comments, db):
     return tree
 
 @app.get("/comments/{topic_id}")
-def get_comments(topic_id: int, db: Session = Depends(get_db)):
+def get_comments(
+    topic_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     comments = db.query(Comment).filter(Comment.topic_id == topic_id).order_by(Comment.created_at).all()
-    return build_comment_tree(comments, db)
+    return build_comment_tree(comments, db, current_user_id=current_user.user_id)
+
 
 # =========================== ЛАЙКИ ТОПИКОВ ДЛЯ ЮЗЕРОВ ===========================
 
