@@ -27,12 +27,6 @@ def get_db():
 
 # ========================== ЭНДПОИНТЫ ==========================
 
-# Проверить таблицы в базе
-# @app.get("/check_tables")
-# def check_tables(db: Session = Depends(get_db)):
-#     tables = db.execute(text("SELECT tablename FROM pg_tables WHERE schemaname='public'")).fetchall()
-#     return {"tables": [table[0] for table in tables]}
-
 # Модель запроса для создания категории
 class CategoryCreate(BaseModel):
     name: str
@@ -208,6 +202,67 @@ def get_steps_by_roadmap(roadmap_id: int, db: Session = Depends(get_db)):
     steps = db.query(Step).filter(Step.roadmap_id == roadmap_id).order_by(Step.step_order).all()
     return steps
 
+# ==================== ДЕРЕВО РОАДМАПОВ С ШАГАМИ ===================================
+@app.get("/roadmap_tree/{roadmap_id}")
+def get_steps_by_roadmap(roadmap_id: int, db: Session = Depends(get_db)):
+    steps = db.query(Step).filter(Step.roadmap_id == roadmap_id).order_by(Step.step_order).all()
+    materials = db.query(StepMaterial).filter(StepMaterial.roadmap_id == roadmap_id).all()
+
+    # Группируем материалы по step_id
+    materials_by_step = {}
+    for m in materials:
+        m.videos = json.loads(m.videos)
+        m.books = json.loads(m.books)
+        materials_by_step.setdefault(m.step_id, []).append({
+            "material_id": m.material_id,
+            "name": m.name,
+            "description": m.description,
+            "tip": m.tip,
+            "videos": m.videos,
+            "books": m.books,
+            "completed": m.completed
+        })
+
+    return build_step_tree(steps, materials_by_step)
+
+
+def build_step_tree(steps, materials_by_step):
+    step_dict = {step.step_id: step for step in steps}
+    tree = []
+
+    def serialize(step):
+        return {
+            "step_id": step.step_id,
+            "step_title": step.step_title,
+            "step_description": step.step_description,
+            "step_order": step.step_order,
+            "created_at": step.created_at.strftime("%Y-%m-%d"),
+            "parent_step_id": step.parent_step_id,
+            "materials": materials_by_step.get(step.step_id, []),
+            "children": []
+        }
+
+    step_data = {step.step_id: serialize(step) for step in steps}
+
+    for step in steps:
+        if step.parent_step_id:
+            parent = step_data.get(step.parent_step_id)
+            if parent:
+                parent["children"].append(step_data[step.step_id])
+        else:
+            tree.append(step_data[step.step_id])
+
+    return tree
+
+
+@app.get("/roadmap_tree/{roadmap_id}")
+def get_steps_by_roadmap(roadmap_id: int, db: Session = Depends(get_db)):
+    steps = db.query(Step).filter(Step.roadmap_id == roadmap_id).order_by(Step.step_order).all()
+    return build_step_tree(steps)
+
+
+
+
 # =========================== КОММЕНТАРИИ ===========================
 
 
@@ -231,11 +286,6 @@ def create_comment(comment: CommentCreate, db: Session = Depends(get_db), curren
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create comment: {str(e)}")
 
-
-# @app.get("/comments/topic/{topic_id}", response_model=List[CommentResponse])
-# def get_comments_by_topic(topic_id: int, db: Session = Depends(get_db)):
-#     comments = db.query(Comment).filter(Comment.topic_id == topic_id).all()
-#     return comments
 
 @app.get("/comments/{comment_id}/replies", response_model=List[CommentResponse])
 def get_replies(comment_id: int, db: Session = Depends(get_db)):
@@ -289,7 +339,7 @@ def build_comment_tree(comments, db, current_user_id=None):
 
     return tree
 
-@app.get("/comments/{topic_id}")
+@app.get("/comments_tree/{topic_id}")
 def get_comments(
     topic_id: int,
     db: Session = Depends(get_db),
