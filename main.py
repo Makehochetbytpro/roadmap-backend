@@ -69,7 +69,7 @@ def get_categories_with_topics(db: Session = Depends(get_db)):
                 dislike_count=topic.dislike_count,
                 category_id=category.category_id,
                 image=topic.image
-            ) for topic in category.topics]
+            ) for topic in sorted(category.topics, key=lambda topic: topic.topic_id)]  # Сортируем топики по topic_id
         )
         result.append(category_data)
 
@@ -99,9 +99,8 @@ def rank_roadmaps(data: RoadmapListRequest):
 
 @app.get("/topics/", response_model=List[TopicRead])
 def get_all_topics(db: Session = Depends(get_db)):
-    topics = db.query(Topic).all()
+    topics = db.query(Topic).order_by(Topic.topic_id).all()
     return topics
-
 
 # ========================== ЛАЙКИ НА ТОПИК ==========================
 
