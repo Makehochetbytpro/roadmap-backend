@@ -206,7 +206,7 @@ class TopicLike(Base):
 
 # Модель для лайков/дизлайков комментариев
 class CommentLike(Base):
-    tablename = "comment_likes"
+    __tablename__ = "comment_likes"
 
     like_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("User.user_id", ondelete="CASCADE"))
@@ -216,15 +216,3 @@ class CommentLike(Base):
 
     user = relationship("User", back_populates="comment_likes")
     comment = relationship("Comment", back_populates="comment_likes")
-
-# class CommentLike(Base):
-#     __tablename__ = "comment_likes"
-
-#     like_id = Column(Integer, primary_key=True, index=True)
-#     user_id = Column(Integer, ForeignKey("User.user_id", ondelete="CASCADE"))
-#     comment_id = Column(Integer, ForeignKey("Comment.comment_id", ondelete="CASCADE"))
-#     is_like = Column(Boolean, default=True)  # True = лайк, False = дизлайк
-#     created_at = Column(TIMESTAMP, default=datetime.datetime.utcnow)
-
-#     user = relationship("User", back_populates="comment_likes")
-#     comment = relationship("Comment", back_populates="comment_likes")
