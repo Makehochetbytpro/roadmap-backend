@@ -12,7 +12,7 @@ from schemas import RoadmapCreateRequest, StepCreateRequest, StepResponse, Comme
 from schemas import CommunityRoadmapCreate, CommunityRoadmapInDB, CommunityRoadmapUpdate, VoteCreate, VoteInDB, CategoryOut, TopicRead, CategoryWithTopics
 from auth import router as auth_router
 from fastapi.middleware.cors import CORSMiddleware
-from auth import get_current_user
+from auth import get_current_user, get_current_user_optional
 from typing import Optional
 
 
@@ -352,10 +352,11 @@ def build_comment_tree(comments, db, current_user_id=None):
 def get_comments(
     topic_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     comments = db.query(Comment).filter(Comment.topic_id == topic_id).order_by(Comment.created_at).all()
-    return build_comment_tree(comments, db, current_user_id=current_user.user_id)
+    user_id = current_user.user_id if current_user else None
+    return build_comment_tree(comments, db, current_user_id=user_id)
 
 
 # =========================== ЛАЙКИ ТОПИКОВ ДЛЯ ЮЗЕРОВ ===========================

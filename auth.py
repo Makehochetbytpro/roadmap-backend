@@ -12,6 +12,7 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from config import settings  # Импортируем защищенные настройки
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 
 app = FastAPI()
 app.add_middleware(
@@ -39,19 +40,18 @@ def create_access_token(data: dict):
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-oauth2_scheme = HTTPBearer()
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    token = credentials.credentials  # Получаем сам токен из Authorization Bearer
+def verify_token(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         username = payload.get("sub")
         if username is None:
-            return None
-        return db.query(User).filter(User.username == username).first()
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 router = APIRouter()
 
@@ -97,20 +97,28 @@ def protected_route(user: User = Depends(verify_token)):
 
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
     try:
-        payload = jwt.decode(token.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        username: str = payload.get("sub")
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username = payload.get("sub")
         if username is None:
-            raise credentials_exception
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+        user = db.query(User).filter(User.username == username).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
     except JWTError:
-        raise credentials_exception
-    user = db.query(User).filter(User.username == username).first()
-    if user is None:
-        raise credentials_exception
-    return user
-
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+def get_current_user_optional(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> Optional[User]:
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        username = payload.get("sub")
+        if username is None:
+            return None
+        user = db.query(User).filter(User.username == username).first()
+        return user
+    except JWTError:
+        return None
+app.include_router(router)
