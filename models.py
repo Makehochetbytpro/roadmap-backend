@@ -80,11 +80,9 @@ class Roadmap(Base):
     created_at = Column(TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
 
     topic = relationship("Topic", back_populates="roadmap")  # Связь с топиком
-    user = relationship("User")  # Кто создал
+    user = relationship("User")  # Кто создал для админов больше
     steps = relationship("Step", back_populates="roadmap", cascade="all, delete-orphan")
-    #comments = relationship("Comment", back_populates="roadmap", cascade="all, delete-orphan")
 
-    # community_roadmap өзгергенде оригинальный роадмап озгерген
 
 
 class CommunityRoadmap(Base):
@@ -208,9 +206,9 @@ class TopicLike(Base):
 
 # Модель для лайков/дизлайков комментариев
 class CommentLike(Base):
-    __tablename__ = "comment_likes"
+    tablename = "comment_likes"
 
-    like_id = Column(Integer, primary_key=True, index=True)
+    like_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("User.user_id", ondelete="CASCADE"))
     comment_id = Column(Integer, ForeignKey("Comment.comment_id", ondelete="CASCADE"))
     is_like = Column(Boolean, default=True)  # True = лайк, False = дизлайк
@@ -218,3 +216,15 @@ class CommentLike(Base):
 
     user = relationship("User", back_populates="comment_likes")
     comment = relationship("Comment", back_populates="comment_likes")
+
+# class CommentLike(Base):
+#     __tablename__ = "comment_likes"
+
+#     like_id = Column(Integer, primary_key=True, index=True)
+#     user_id = Column(Integer, ForeignKey("User.user_id", ondelete="CASCADE"))
+#     comment_id = Column(Integer, ForeignKey("Comment.comment_id", ondelete="CASCADE"))
+#     is_like = Column(Boolean, default=True)  # True = лайк, False = дизлайк
+#     created_at = Column(TIMESTAMP, default=datetime.datetime.utcnow)
+
+#     user = relationship("User", back_populates="comment_likes")
+#     comment = relationship("Comment", back_populates="comment_likes")
