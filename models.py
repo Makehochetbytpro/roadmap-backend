@@ -80,11 +80,9 @@ class Roadmap(Base):
     created_at = Column(TIMESTAMP, default=datetime.datetime.utcnow, nullable=False)
 
     topic = relationship("Topic", back_populates="roadmap")  # Связь с топиком
-    user = relationship("User")  # Кто создал
+    user = relationship("User")  # Кто создал для админов больше
     steps = relationship("Step", back_populates="roadmap", cascade="all, delete-orphan")
-    #comments = relationship("Comment", back_populates="roadmap", cascade="all, delete-orphan")
 
-    # community_roadmap өзгергенде оригинальный роадмап озгерген
 
 
 class CommunityRoadmap(Base):

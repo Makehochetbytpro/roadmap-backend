@@ -78,7 +78,7 @@ def get_categories_with_topics(db: Session = Depends(get_db)):
                 dislike_count=topic.dislike_count,
                 category_id=category.category_id,
                 image=topic.image
-            ) for topic in category.topics]
+            ) for topic in sorted(category.topics, key=lambda topic: topic.topic_id)]  # Сортируем топики по topic_id
         )
         result.append(category_data)
 
@@ -104,13 +104,43 @@ def rank_roadmaps(data: RoadmapListRequest):
     sorted_roadmaps = sorted(roadmaps_with_scores, key=lambda x: x["bayesian_score"], reverse=True)
     return {"bayesian_ranking": sorted_roadmaps}
 
+# ================ Алгоритм для ранкинга примененный для БД ===================
+@app.get("/rank_roadmaps")
+def rank_existing_roadmaps(db: Session = Depends(get_db), C: float = 0.5, m: int = 50):
+    roadmaps = db.query(Roadmap).all()
+    ranked_roadmaps = []
+
+    for r in roadmaps:
+        topic = db.query(Topic).filter(Topic.topic_id == r.topic_id).first()
+        if not topic:
+            continue
+
+        likes = db.query(TopicLike).filter_by(topic_id=topic.topic_id, is_like=True).count()
+        dislikes = db.query(TopicLike).filter_by(topic_id=topic.topic_id, is_like=False).count()
+
+        bayesian_score = (likes + C * m) / (likes + dislikes + m) if (likes + dislikes + m) > 0 else 0
+
+        ranked_roadmaps.append({
+            "roadmap_id": r.roadmap_id,
+            "topic_id": r.topic_id,
+            "topic_name": topic.name,
+            "likes": likes,
+            "dislikes": dislikes,
+            "bayesian_score": bayesian_score,
+            "created_at": r.created_at
+        })
+
+
+    sorted_roadmaps = sorted(ranked_roadmaps, key=lambda x: x["bayesian_score"], reverse=True)
+    return {"bayesian_ranking": sorted_roadmaps}
+
+
 #============================ ПОЛУЧЕНИЕ ВСЕХ ТОПИКОВ =========================
 
 @app.get("/topics/", response_model=List[TopicRead])
 def get_all_topics(db: Session = Depends(get_db)):
-    topics = db.query(Topic).all()
+    topics = db.query(Topic).order_by(Topic.topic_id).all()
     return topics
-
 
 # ========================== ЛАЙКИ НА ТОПИК ==========================
 
